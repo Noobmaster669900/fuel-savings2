@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>การประหยัดค่าน้ำมันต่อเดือน</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #2c3e50;
+      --secondary: #3498db;
+      --bg-light: #f9f9f9;
+      --bg-dark: #1e1e1e;
+      --text-light: #fff;
+      --text-dark: #333;
+    }
+
+    body {
+      font-family: 'Noto Sans Thai', sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background-color: var(--bg-light);
+      color: var(--text-dark);
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    body.dark {
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+    }
+
+    .container {
+      max-width: 720px;
+      margin: auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      padding: 2rem;
+      transition: background 0.3s;
+    }
+
+    body.dark .container {
+      background: #2b2b2b;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      font-weight: 600;
+    }
+
+    label {
+      font-weight: 500;
+      margin-top: 1rem;
+      display: block;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 0.25rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 1.5rem;
+      width: 100%;
+      padding: 0.85rem;
+      font-size: 1.1rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: var(--secondary);
+    }
+
+    .toggle-mode {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 6px 12px;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      background: var(--secondary);
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    .result {
+      margin-top: 2rem;
+      font-size: 1.2rem;
+      font-weight: 500;
+      text-align: center;
+      background: #ecf0f1;
+      padding: 1rem;
+      border-radius: 10px;
+    }
+
+    body.dark .result {
+      background: #3c3c3c;
+    }
+
+    canvas {
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+
+  <button class="toggle-mode" onclick="toggleDarkMode()">🌓 โหมดกลางวัน/กลางคืน</button>
+
+  <div class="container">
+    <h2>การประหยัดค่าน้ำมันต่อเดือน</h2>
+
+    <label>เลือกโหมดการคำนวณ:</label>
+    <select id="mode" onchange="toggleInputFields()">
+      <option value="both">คิดทั้งค่าน้ำมันและค่าไฟ</option>
+      <option value="fuelOnly">คิดเฉพาะค่าน้ำมัน</option>
+      <option value="electricOnly">คิดเฉพาะค่าไฟ</option>
+    </select>
+
+    <div id="fuelFields">
+      <label>อัตราการบริโภคน้ำมัน (ลิตร / 100 กม.)</label>
+      <input type="number" id="fuelEfficiency" placeholder="เช่น 6.5" step="0.1">
+
+      <label>ค่าน้ำมัน (บาท / ลิตร)</label>
+      <input type="number" id="fuelPrice" placeholder="เช่น 42" step="0.01">
+    </div>
+
+    <div id="electricFields">
+      <label>ค่าไฟฟ้า (บาท / kWh)</label>
+      <input type="number" id="electricityPrice" placeholder="เช่น 4.5" step="0.01">
+    </div>
+
+    <label>ระยะทางการขับขี่ต่อปี (กม.)</label>
+    <input type="number" id="yearlyDistance" placeholder="เช่น 25000">
+
+    <button onclick="calculateSavings()">คำนวณ</button>
+
+    <div class="result" id="resultArea"></div>
+    <canvas id="comparisonChart" width="400" height="200"></canvas>
+  </div>
+
+  <script>
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark");
+      localStorage.setItem("theme", document.body.classList.contains("dark") ? "dark" : "light");
+    }
+
+    function toggleInputFields() {
+      const mode = document.getElementById('mode').value;
+      document.getElementById('fuelFields').style.display = (mode === 'fuelOnly' || mode === 'both') ? 'block' : 'none';
+      document.getElementById('electricFields').style.display = (mode === 'electricOnly' || mode === 'both') ? 'block' : 'none';
+    }
+
+    window.onload = () => {
+      if (localStorage.getItem("theme") === "dark") {
+        document.body.classList.add("dark");
+      }
+      toggleInputFields();
+    }
+
+    function formatNumber(num) {
+      return new Intl.NumberFormat('th-TH').format(num);
+    }
+
+    function calculateSavings() {
+      const mode = document.getElementById('mode').value;
+      const fuelEfficiency = parseFloat(document.getElementById('fuelEfficiency').value);
+      const yearlyDistance = parseFloat(document.getElementById('yearlyDistance').value);
+      const fuelPrice = parseFloat(document.getElementById('fuelPrice').value);
+      const electricityPrice = parseFloat(document.getElementById('electricityPrice').value);
+
+      let fuelCostPerYear = 0;
+      let electricCostPerYear = 0;
+
+      if (isNaN(yearlyDistance)) {
+        document.getElementById('resultArea').innerHTML = "กรุณากรอกระยะทางต่อปีให้ครบถ้วน";
+        return;
+      }
+
+      if ((mode === 'fuelOnly' || mode === 'both') && (!fuelEfficiency || !fuelPrice)) {
+        document.getElementById('resultArea').innerHTML = "กรุณากรอกข้อมูลค่าน้ำมันให้ครบถ้วน";
+        return;
+      }
+
+      if ((mode === 'electricOnly' || mode === 'both') && (!electricityPrice)) {
+        document.getElementById('resultArea').innerHTML = "กรุณากรอกข้อมูลค่าไฟฟ้าให้ครบถ้วน";
+        return;
+      }
+
+      if (mode !== 'electricOnly') {
+        const litersUsed = (fuelEfficiency / 100) * yearlyDistance;
+        fuelCostPerYear = litersUsed * fuelPrice;
+      }
+
+      if (mode !== 'fuelOnly') {
+        const kWhPer100km = 13;
+        const electricUsed = (kWhPer100km / 100) * yearlyDistance;
+        electricCostPerYear = electricUsed * electricityPrice;
+      }
+
+      let monthlySavings = 0;
+      let yearlySavings = 0;
+
+      if (mode === 'both') {
+        monthlySavings = (fuelCostPerYear - electricCostPerYear) / 12;
+        yearlySavings = fuelCostPerYear - electricCostPerYear;
+      }
+
+      let resultHTML = '';
+
+      if (mode === 'fuelOnly') {
+        resultHTML += `ค่าน้ำมันประมาณ <strong>฿${formatNumber((fuelCostPerYear / 12).toFixed(0))}</strong> ต่อเดือน<br>`;
+        resultHTML += `หรือประมาณ <strong>฿${formatNumber(fuelCostPerYear.toFixed(0))}</strong> ต่อปี`;
+      } else if (mode === 'electricOnly') {
+        resultHTML += `ค่าไฟประมาณ <strong>฿${formatNumber((electricCostPerYear / 12).toFixed(0))}</strong> ต่อเดือน<br>`;
+        resultHTML += `หรือประมาณ <strong>฿${formatNumber(electricCostPerYear.toFixed(0))}</strong> ต่อปี`;
+      } else {
+        resultHTML += `คุณสามารถประหยัดเงินได้ประมาณ <strong>฿${formatNumber(monthlySavings.toFixed(0))}</strong> ต่อเดือน` +
+                      `<br>และประมาณ <strong>฿${formatNumber(yearlySavings.toFixed(0))}</strong> ต่อปี`;
+      }
+
+      document.getElementById('resultArea').innerHTML = resultHTML;
+
+      const ctx = document.getElementById('comparisonChart').getContext('2d');
+      if (window.myChart) window.myChart.destroy();
+
+      if (mode === 'both') {
+        window.myChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['ใช้น้ำมัน', 'ใช้ไฟฟ้า'],
+            datasets: [{
+              label: 'ค่าใช้จ่ายต่อปี (บาท)',
+              data: [fuelCostPerYear, electricCostPerYear],
+              backgroundColor: ['#e74c3c', '#2ecc71']
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return `฿${formatNumber(context.raw.toFixed(0))}`;
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) {
+                    return `฿${formatNumber(value)}`;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+  </script>
+
+</body>
+</html>
